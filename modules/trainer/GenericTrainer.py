@@ -362,7 +362,7 @@ class GenericTrainer(BaseTrainer):
         if self.args.save_to_output_folder:
             save_path = self.args.output_model_destination
             save_split = save_path.split(".")
-            name = save_split[0:-1]
+            name = ".".join(save_split[:-1])
             extension = save_split[-1]
             save_path = f"{name}-e{train_progress.epoch}.{extension}"
         else:  
