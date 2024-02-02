@@ -364,7 +364,7 @@ class GenericTrainer(BaseTrainer):
             save_split = save_path.split(".")
             name = ".".join(save_split[:-1])
             extension = save_split[-1]
-            save_path = f"{name}-e{train_progress.epoch}.{extension}"
+            save_path = f"{name}-e{train_progress.epoch:04}.{extension}"
         else:  
             save_path = os.path.join(
                 self.args.workspace_dir,
