@@ -205,12 +205,14 @@ class TrainArgs(BaseArgs):
     # backup settings
     backup_after: float
     backup_after_unit: TimeUnit
+    backup_skip_first_n: int
     rolling_backup: bool
     rolling_backup_count: int
     backup_before_save: bool
-    save_to_output_folder: bool
     save_after: float
     save_after_unit: TimeUnit
+    save_to_output_folder: bool
+    save_skip_first_n: int
 
     def __init__(self, data: list[(str, Any, type, bool)]):
         super(TrainArgs, self).__init__(data)
@@ -446,13 +448,14 @@ class TrainArgs(BaseArgs):
         # backup settings
         parser.add_argument("--backup-after", type=float, required=True, dest="backup_after", help="The interval for backups")
         parser.add_argument("--backup-after-unit", type=TimeUnit, required=True, dest="backup_after_unit", help="The unit applied to the backup-after option")
+        parser.add_argument("--backup-skip-first-n", type=int, required=False, default=0, dest="backup_skip_first_n", help="Whether to skip backing up the first n unit")
         parser.add_argument("--rolling-backup", required=False, action='store_true', dest="rolling_backup", help="Enable rolling backups")
         parser.add_argument("--rolling-backup-count", type=int, required=False, default=3, dest="rolling_backup_count", help="The number of backups to keep if rolling backups are enabled")
         parser.add_argument("--backup-before-save", required=False, action='store_true', dest="backup_before_save", help="Create a backup before saving the final model")
-        parser.add_argument("--save-to-output-folder", type=bool, required=False, default=False, dest="save_to_output_folder", help="Whether to save to the output folder as {output-model-destination}-e{epoch} instead of a workspace save")
         parser.add_argument("--save-after", type=float, required=False, default=0, dest="save_after", help="The interval for backups")
         parser.add_argument("--save-after-unit", type=TimeUnit, required=False, default=TimeUnit.NEVER, dest="save_after_unit", help="The unit applied to the backup-after option")
-
+        parser.add_argument("--save-to-output-folder", type=bool, required=False, default=False, dest="save_to_output_folder", help="Whether to save to the output folder as {output-model-destination}-e{epoch} instead of a workspace save")
+        parser.add_argument("--save-skip-first-n", type=int, required=False, default=0, dest="save_skip_first_n", help="Whether to skip saving the first n unit")
         # @formatter:on
 
         args = TrainArgs.default_values()
@@ -650,11 +653,13 @@ class TrainArgs(BaseArgs):
         # backup settings
         data.append(("backup_after", 30, int, False))
         data.append(("backup_after_unit", TimeUnit.MINUTE, TimeUnit, False))
+        data.append(("backup_skip_first_n", 0, int, False))
         data.append(("rolling_backup", False, bool, False))
         data.append(("rolling_backup_count", 3, int, False))
         data.append(("backup_before_save", True, bool, False))
-        data.append(("save_to_output_folder", False, bool, False))
         data.append(("save_after", 0, int, False))
         data.append(("save_after_unit", TimeUnit.NEVER, TimeUnit, False))
+        data.append(("save_to_output_folder", False, bool, False))
+        data.append(("save_skip_first_n", 0, int, False))
 
         return TrainArgs(data)

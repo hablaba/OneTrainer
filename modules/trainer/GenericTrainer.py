@@ -405,12 +405,14 @@ class GenericTrainer(BaseTrainer):
 
     def __needs_backup(self, train_progress: TrainProgress):
         return self.action_needed(
-            "backup", self.args.backup_after, self.args.backup_after_unit, train_progress, start_at_zero=False
+            "backup", self.args.backup_after, self.args.backup_after_unit, train_progress, start_at_zero=False,
+            skip_first_n=self.args.backup_skip_first_n
         )
 
     def __needs_save(self, train_progress: TrainProgress):
         return self.action_needed(
-            "save", self.args.save_after, self.args.save_after_unit, train_progress, start_at_zero=False
+            "save", self.args.save_after, self.args.save_after_unit, train_progress, start_at_zero=False,
+            skip_first_n=self.args.save_skip_first_n
         )
 
     def __needs_gc(self, train_progress: TrainProgress):

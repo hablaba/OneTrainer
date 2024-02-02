@@ -77,7 +77,7 @@ class BaseTrainer(metaclass=ABCMeta):
         )
 
     def action_needed(self, name: str, interval: float, unit: TimeUnit, train_progress: TrainProgress,
-                      start_at_zero: bool = True):
+                      start_at_zero: bool = True, skip_first_n: int = 0):
         if name not in self.previous_action:
             self.previous_action[name] = -1
 
@@ -88,12 +88,12 @@ class BaseTrainer(metaclass=ABCMeta):
                 else:
                     # should actually be the last step of each epoch, but we don't know how many steps an epoch has
                     return train_progress.epoch % int(interval) == 0 and train_progress.epoch_step == 0 \
-                        and train_progress.epoch > 0
+                        and train_progress.epoch > 0 and train_progress.epoch > skip_first_n
             case TimeUnit.STEP:
                 if start_at_zero:
                     return train_progress.global_step % int(interval) == 0
                 else:
-                    return (train_progress.global_step + 1) % int(interval) == 0
+                    return (train_progress.global_step + 1) % int(interval) == 0 and train_progress.global_step > skip_first_n
             case TimeUnit.SECOND:
                 if not start_at_zero and self.previous_action[name] < 0:
                     self.previous_action[name] = time.time()
