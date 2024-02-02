@@ -359,11 +359,18 @@ class GenericTrainer(BaseTrainer):
 
         self.callbacks.on_update_status("saving")
 
-        save_path = os.path.join(
-            self.args.workspace_dir,
-            "save",
-            f"{get_string_timestamp()}-save-{train_progress.filename_string()}{self.args.output_model_format.file_extension()}"
-        )
+        if self.args.save_to_output_folder:
+            save_path = self.args.output_model_destination
+            save_split = save_path.split(".")
+            name = save_split[0:-1]
+            extension = save_split[-1]
+            save_path = f"{name}-e{train_progress.epoch}.{extension}"
+        else:  
+            save_path = os.path.join(
+                self.args.workspace_dir,
+                "save",
+                f"{get_string_timestamp()}-save-{train_progress.filename_string()}{self.args.output_model_format.file_extension()}"
+            )
         print("Saving " + save_path)
 
         try:

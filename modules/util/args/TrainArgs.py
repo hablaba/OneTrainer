@@ -208,6 +208,7 @@ class TrainArgs(BaseArgs):
     rolling_backup: bool
     rolling_backup_count: int
     backup_before_save: bool
+    save_to_output_folder: bool
     save_after: float
     save_after_unit: TimeUnit
 
@@ -448,6 +449,7 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--rolling-backup", required=False, action='store_true', dest="rolling_backup", help="Enable rolling backups")
         parser.add_argument("--rolling-backup-count", type=int, required=False, default=3, dest="rolling_backup_count", help="The number of backups to keep if rolling backups are enabled")
         parser.add_argument("--backup-before-save", required=False, action='store_true', dest="backup_before_save", help="Create a backup before saving the final model")
+        parser.add_argument("--save-to-output-folder", type=bool, required=False, default=False, dest="save_to_output_folder", help="Whether to save to the output folder as {output-model-destination}-e{epoch} instead of a workspace save")
         parser.add_argument("--save-after", type=float, required=False, default=0, dest="save_after", help="The interval for backups")
         parser.add_argument("--save-after-unit", type=TimeUnit, required=False, default=TimeUnit.NEVER, dest="save_after_unit", help="The unit applied to the backup-after option")
 
@@ -651,6 +653,7 @@ class TrainArgs(BaseArgs):
         data.append(("rolling_backup", False, bool, False))
         data.append(("rolling_backup_count", 3, int, False))
         data.append(("backup_before_save", True, bool, False))
+        data.append(("save_to_output_folder", False, bool, False))
         data.append(("save_after", 0, int, False))
         data.append(("save_after_unit", TimeUnit.NEVER, TimeUnit, False))
 
