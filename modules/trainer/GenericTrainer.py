@@ -455,7 +455,7 @@ class GenericTrainer(BaseTrainer):
         accumulated_loss = 0.0
         ema_loss = None
         for epoch in tqdm(range(train_progress.epoch, self.args.epochs, 1), desc="epoch"):
-            if self.args.max_steps and self.args.max_steps >= train_progress.global_step:
+            if self.args.max_steps and train_progress.global_step >= self.args.max_steps :
                 print(f"Got to max_steps of {self.args.max_steps}, ending!")
                 break
             self.callbacks.on_update_status("starting epoch/caching")
