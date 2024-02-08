@@ -366,7 +366,7 @@ class GenericTrainer(BaseTrainer):
             extension = save_split[-1]
             
             if self.args.save_after_unit == TimeUnit.STEP:
-                incremental_str = f"s{train_progress.global_step:04}"
+                incremental_str = f"s{train_progress.global_step+1:04}"
             elif self.args.sample_after_unit == TimeUnit.EPOCH:
                incremental_str = f"e{train_progress.epoch:04}"
             else:
