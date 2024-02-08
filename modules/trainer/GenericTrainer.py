@@ -454,129 +454,134 @@ class GenericTrainer(BaseTrainer):
         lr_scheduler = None
         accumulated_loss = 0.0
         ema_loss = None
-        for epoch in tqdm(range(train_progress.epoch, self.args.epochs, 1), desc="epoch"):
-            if self.args.max_steps and train_progress.global_step >= self.args.max_steps :
-                print(f"Got to max_steps of {self.args.max_steps}, ending!")
-                break
-            self.callbacks.on_update_status("starting epoch/caching")
+        total_tracked = self.args.epochs
+        if self.args.max_steps:
+            total_tracked = self.args.max_steps
+            
+        with tqdm(total=total_tracked) as pbar:
+            for epoch in range(train_progress.epoch, self.args.epochs, 1):
+                if not self.args.max_steps:
+                        pbar.update()
+                if self.args.max_steps and train_progress.global_step >= self.args.max_steps :
+                    print(f"Got to max_steps of {self.args.max_steps}, ending!")
+                    break
+                self.callbacks.on_update_status("starting epoch/caching")
 
-            self.data_loader.get_data_set().start_next_epoch()
-            self.model_setup.setup_train_device(self.model, self.args)
-            torch_gc()
+                self.data_loader.get_data_set().start_next_epoch()
+                self.model_setup.setup_train_device(self.model, self.args)
+                torch_gc()
 
-            if lr_scheduler is None:
-                lr_scheduler = create.create_lr_scheduler(
-                    optimizer=self.model.optimizer,
-                    learning_rate_scheduler=self.args.learning_rate_scheduler,
-                    warmup_steps=self.args.learning_rate_warmup_steps,
-                    num_cycles=self.args.learning_rate_cycles,
-                    num_epochs=self.args.epochs,
-                    approximate_epoch_length=self.data_loader.get_data_set().approximate_length(),
-                    batch_size=self.args.batch_size,
-                    gradient_accumulation_steps=self.args.gradient_accumulation_steps,
-                    global_step=train_progress.global_step
-                )
-
-            current_epoch_length = len(self.data_loader.get_data_loader()) + train_progress.epoch_step
-            extra_desc = f"e {epoch}/{self.args.epochs}"
-            if self.args.max_steps:
-                extra_desc = f"s {train_progress.global_step}/{self.args.max_steps}"
-            step_tqdm = tqdm(self.data_loader.get_data_loader(), desc=f"{extra_desc} - step")
-            for epoch_step, batch in enumerate(step_tqdm):
-                if self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
-                    self.__enqueue_sample_during_training(
-                        lambda: self.__sample_during_training(train_progress, train_device)
+                if lr_scheduler is None:
+                    lr_scheduler = create.create_lr_scheduler(
+                        optimizer=self.model.optimizer,
+                        learning_rate_scheduler=self.args.learning_rate_scheduler,
+                        warmup_steps=self.args.learning_rate_warmup_steps,
+                        num_cycles=self.args.learning_rate_cycles,
+                        num_epochs=self.args.epochs,
+                        approximate_epoch_length=self.data_loader.get_data_set().approximate_length(),
+                        batch_size=self.args.batch_size,
+                        gradient_accumulation_steps=self.args.gradient_accumulation_steps,
+                        global_step=train_progress.global_step
                     )
 
-                sample_commands = self.commands.get_and_reset_sample_custom_commands()
-                if sample_commands:
-                    def create_sample_commands_fun(sample_commands):
-                        def sample_commands_fun():
-                            self.__sample_during_training(train_progress, train_device, sample_commands)
+                current_epoch_length = len(self.data_loader.get_data_loader()) + train_progress.epoch_step
+                for epoch_step, batch in enumerate(self.data_loader.get_data_loader()):
+                    if self.args.max_steps:
+                        pbar.update()
+                    if self.__needs_sample(train_progress) or self.commands.get_and_reset_sample_default_command():
+                        self.__enqueue_sample_during_training(
+                            lambda: self.__sample_during_training(train_progress, train_device)
+                        )
 
-                        return sample_commands_fun
+                    sample_commands = self.commands.get_and_reset_sample_custom_commands()
+                    if sample_commands:
+                        def create_sample_commands_fun(sample_commands):
+                            def sample_commands_fun():
+                                self.__sample_during_training(train_progress, train_device, sample_commands)
 
-                    self.__enqueue_sample_during_training(create_sample_commands_fun(sample_commands))
+                            return sample_commands_fun
 
-                if self.__needs_gc(train_progress):
-                    torch_gc()
+                        self.__enqueue_sample_during_training(create_sample_commands_fun(sample_commands))
 
-                if not has_gradient:
-                    self.__execute_sample_during_training()
+                    if self.__needs_gc(train_progress):
+                        torch_gc()
 
-                if self.__needs_backup(train_progress) or self.commands.get_and_reset_backup_command():
-                    self.backup(train_progress)
+                    if not has_gradient:
+                        self.__execute_sample_during_training()
 
-                if self.__needs_save(train_progress):
-                    self.save(train_progress)
+                    if self.__needs_backup(train_progress) or self.commands.get_and_reset_backup_command():
+                        self.backup(train_progress)
 
-                self.callbacks.on_update_status("training")
+                    if self.__needs_save(train_progress):
+                        self.save(train_progress)
 
-                model_output_data = self.model_setup.predict(self.model, batch, self.args, train_progress)
+                    self.callbacks.on_update_status("training")
 
-                loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.args)
+                    model_output_data = self.model_setup.predict(self.model, batch, self.args, train_progress)
 
-                loss = loss / self.args.gradient_accumulation_steps
-                if scaler:
-                    scaler.scale(loss).backward()
-                else:
-                    loss.backward()
-                has_gradient = True
-                accumulated_loss += loss.item()
+                    loss = self.model_setup.calculate_loss(self.model, batch, model_output_data, self.args)
 
-                if self.__is_update_step(train_progress):
+                    loss = loss / self.args.gradient_accumulation_steps
                     if scaler:
-                        scaler.unscale_(self.model.optimizer)
-                        nn.utils.clip_grad_norm_(self.parameters, 1)
-                        scaler.step(self.model.optimizer)
-                        scaler.update()
+                        scaler.scale(loss).backward()
                     else:
-                        nn.utils.clip_grad_norm_(self.parameters, 1)
-                        self.model.optimizer.step()
+                        loss.backward()
+                    has_gradient = True
+                    accumulated_loss += loss.item()
 
-                    lr_scheduler.step()  # done before zero_grad, because some lr schedulers need gradients
-                    self.model.optimizer.zero_grad(set_to_none=True)
-                    has_gradient = False
+                    if self.__is_update_step(train_progress):
+                        if scaler:
+                            scaler.unscale_(self.model.optimizer)
+                            nn.utils.clip_grad_norm_(self.parameters, 1)
+                            scaler.step(self.model.optimizer)
+                            scaler.update()
+                        else:
+                            nn.utils.clip_grad_norm_(self.parameters, 1)
+                            self.model.optimizer.step()
 
-                    self.tensorboard.add_scalar(
-                        "learning_rate", lr_scheduler.get_last_lr()[0], train_progress.global_step
-                    )
-                    self.tensorboard.add_scalar("loss", accumulated_loss, train_progress.global_step)
-                    ema_loss = ema_loss or accumulated_loss
-                    ema_loss = (ema_loss * 0.99) + (accumulated_loss * 0.01)
-                    step_tqdm.set_postfix({
-                        'loss': accumulated_loss,
-                        'smooth loss': ema_loss,
-                    })
-                    self.tensorboard.add_scalar("smooth loss", ema_loss, train_progress.global_step)
-                    accumulated_loss = 0.0
+                        lr_scheduler.step()  # done before zero_grad, because some lr schedulers need gradients
+                        self.model.optimizer.zero_grad(set_to_none=True)
+                        has_gradient = False
 
-                    self.model_setup.after_optimizer_step(self.model, self.args, train_progress)
-                    if self.model.ema:
-                        update_step = train_progress.global_step // self.args.gradient_accumulation_steps
                         self.tensorboard.add_scalar(
-                            "ema_decay",
-                            self.model.ema.get_current_decay(update_step),
-                            train_progress.global_step
+                            "learning_rate", lr_scheduler.get_last_lr()[0], train_progress.global_step
                         )
-                        self.model.ema.step(
-                            self.parameters,
-                            update_step
-                        )
+                        self.tensorboard.add_scalar("loss", accumulated_loss, train_progress.global_step)
+                        ema_loss = ema_loss or accumulated_loss
+                        ema_loss = (ema_loss * 0.99) + (accumulated_loss * 0.01)
+                        step_tqdm.set_postfix({
+                            'loss': accumulated_loss,
+                            'smooth loss': ema_loss,
+                        })
+                        self.tensorboard.add_scalar("smooth loss", ema_loss, train_progress.global_step)
+                        accumulated_loss = 0.0
 
-                    self.one_step_trained = True
+                        self.model_setup.after_optimizer_step(self.model, self.args, train_progress)
+                        if self.model.ema:
+                            update_step = train_progress.global_step // self.args.gradient_accumulation_steps
+                            self.tensorboard.add_scalar(
+                                "ema_decay",
+                                self.model.ema.get_current_decay(update_step),
+                                train_progress.global_step
+                            )
+                            self.model.ema.step(
+                                self.parameters,
+                                update_step
+                            )
 
-                train_progress.next_step(self.args.batch_size)
+                        self.one_step_trained = True
+
+                    train_progress.next_step(self.args.batch_size)
+                    self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.args.epochs)
+
+                    if self.commands.get_stop_command():
+                        return
+
+                train_progress.next_epoch()
                 self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.args.epochs)
 
                 if self.commands.get_stop_command():
                     return
-
-            train_progress.next_epoch()
-            self.callbacks.on_update_train_progress(train_progress, current_epoch_length, self.args.epochs)
-
-            if self.commands.get_stop_command():
-                return
 
     def end(self):
         if self.one_step_trained:
