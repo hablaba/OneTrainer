@@ -1,5 +1,5 @@
 import argparse
-from typing import Any
+from typing import Any, Optional
 
 from modules.util.ModelNames import ModelNames
 from modules.util.ModelWeightDtypes import ModelWeightDtypes
@@ -53,6 +53,7 @@ class TrainArgs(BaseArgs):
     learning_rate_warmup_steps: int
     learning_rate_cycles: float
     epochs: int
+    max_steps: Optional[int]
     batch_size: int
     gradient_accumulation_steps: int
     ema: EMAMode
@@ -298,6 +299,7 @@ class TrainArgs(BaseArgs):
         parser.add_argument("--learning-rate-warmup-steps", type=int, required=False, default=0, dest="learning_rate_warmup_steps", help="The number of warmup steps when creating the learning rate scheduler")
         parser.add_argument("--learning-rate-cycles", type=float, required=False, default=1, dest="learning_rate_cycles", help="The number of cycles of the learning rate scheduler")
         parser.add_argument("--epochs", type=int, required=True, dest="epochs", help="Number of epochs to train")
+        parser.add_argument("--max-steps", type=int, required=False, dest="max_steps", help="Maximum number of steps to train (ends early if less than total steps for epochs)")
         parser.add_argument("--batch-size", type=int, required=True, dest="batch_size", help="The batch size")
         parser.add_argument("--gradient-accumulation-steps", type=int, required=False, default=1, dest="gradient_accumulation_steps", help="The amount of steps used for gradient accumulation")
         parser.add_argument("--ema", type=EMAMode, required=False, default=EMAMode.OFF, dest="ema", help="Activate EMA during training", choices=list(EMAMode))
@@ -501,6 +503,7 @@ class TrainArgs(BaseArgs):
         data.append(("learning_rate_warmup_steps", 200, int, False))
         data.append(("learning_rate_cycles", 1, int, False))
         data.append(("epochs", 100, int, False))
+        data.append(("max_steps", None, int, True))
         data.append(("batch_size", 1, int, False))
         data.append(("gradient_accumulation_steps", 1, int, False))
         data.append(("ema", EMAMode.OFF, EMAMode, False))

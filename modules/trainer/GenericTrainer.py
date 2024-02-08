@@ -364,7 +364,14 @@ class GenericTrainer(BaseTrainer):
             save_split = save_path.split(".")
             name = ".".join(save_split[:-1])
             extension = save_split[-1]
-            save_path = f"{name}-e{train_progress.epoch:04}.{extension}"
+            
+            if self.args.save_after_unit == TimeUnit.STEP:
+                incremental_str = f"s{train_progress.global_step:04}"
+            elif self.args.sample_after_unit == TimeUnit.EPOCH:
+               incremental_str = f"e{train_progress.epoch:04}"
+            else:
+                raise ValueError("Invalid `save_after_unit`, must be step or epoch for use with `save_to_output_folder`") 
+            save_path = f"{name}-{incremental_str}.{extension}"
         else:  
             save_path = os.path.join(
                 self.args.workspace_dir,
@@ -448,6 +455,9 @@ class GenericTrainer(BaseTrainer):
         accumulated_loss = 0.0
         ema_loss = None
         for epoch in tqdm(range(train_progress.epoch, self.args.epochs, 1), desc="epoch"):
+            if self.args.max_steps and self.args.max_steps >= train_progress.global_step:
+                print(f"Got to max_steps of {self.args.max_steps}, ending!")
+                break
             self.callbacks.on_update_status("starting epoch/caching")
 
             self.data_loader.get_data_set().start_next_epoch()
